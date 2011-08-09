@@ -172,14 +172,15 @@ struct Config
 
 void loadConfig(Config& config) {
     ConfigFile theconfig( "config.txt" );
-    config.server = theconfig.readInto( server, "server" );
-    config.port = theconfig.readInto( port, "port" );
-    config.mainchannel = theconfig.readInto( mainchannel, "mainchannel" );
-    config.channels = theconfig.readInto( channels, "channels" );
-    config.nick = theconfig.readInto( nick, "nick" );
-    config.username = theconfig.readInto( username, "username" );
-    config.nickservpassword = theconfig.readInto( nickservpassword, "nickservpassword" );
-    config.owner_nick = theconfig.readInto( owner_nick, "owner_nick" );
+    theconfig.readInto( config.server, "server" );
+    theconfig.readInto( config.port, "port" );
+    theconfig.readInto( config.mainchannel, "mainchannel" );
+
+    theconfig.readInto( config.channels, "channels" );
+    theconfig.readInto( config.nick, "nick" );
+    theconfig.readInto( config.username, "username" );
+    theconfig.readInto( config.nickservpassword, "nickservpassword" );
+    theconfig.readInto( config.owner_nick, "owner_nick" );
 }
 
 int main ()

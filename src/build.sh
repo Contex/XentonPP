@@ -1,7 +1,7 @@
 clear
 build_it ()
 {
-  g++ main.cpp Socket.cpp Socket.h SocketException.h -o xentonpp
+  g++ main.cpp Socket.cpp Socket.h SocketException.h ConfigFile.cpp ConfigFile.h -o xentonpp
   echo " "
   echo "<=====================================>"
   echo Done building!

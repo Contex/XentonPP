@@ -2,6 +2,7 @@
 
 #include "Socket.h"
 #include "SocketException.h"
+#include "ConfigFile.h"
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,31 +12,10 @@
 #include <iterator>
 #include <vector>
 #include <sstream>
+#include <fstream>
+#include <sstream>
 
 using namespace std;
-
-const string server = "irc.crrpg.net";
-const string port = "6667";
-//make sure the channel name is the same case as the one on IRC
-const string mainChannel = "#Xenton++";
-const string channels = "#Xenton,#Contex,#Minecraft";
-const string vHosts = "Contex@4814A9F9.8B4A902C.3D43332A.IP";
-const string nick = "XentonPP";
-const string usrname = "XentonPP";
-const string nickservpass = "Dr3cRe2R";
-const string welcome_msg = nick+" has connected. Type !time to see the time.";
-const string kick_msg = "KICK "+mainChannel+" "+nick;
-//353 is a code the server returns whenever you join a channel
-const string chnl_join_rsl = "353 "+nick;
-//433 replies that the nick is taken
-const string nick_taken_rsl = "433 * "+nick+" :Nickname is already in use.";
-const string owner_nick = "Contex";
-const string rejoin_msg = "NOTICE "+nick+" :!rejoin";
-//001 is just the generic welcome message saying you have logged in to the server.
-const string server_welcome = "005 "+nick;
-const string con_closed_nick = "[Registration timeout]";
-
-const bool rejoin_on_kick = true;
 
 vector<string> split(const string& strValue, char separator)
 {
@@ -87,8 +67,6 @@ string make_pass(){
   string pass_str = pass_ss.str();
   return pass_str;
 }
-const string password = make_pass();
-const string quit_req = "NOTICE "+nick+" :!quit "+password;
 
 string getRaw(string reply, string what) 
 {
@@ -180,15 +158,55 @@ bool isCommand(string reply, string command)
 	}
 }
 
+struct Config
+{
+    string server;
+    string port;
+    string mainchannel;
+    string channels;
+    string nick;
+    string username;
+    string nickservpassword;
+    string owner_nick;
+};
+
+void loadConfig(Config& config) {
+    ConfigFile theconfig( "config.txt" );
+    config.server = theconfig.readInto( server, "server" );
+    config.port = theconfig.readInto( port, "port" );
+    config.mainchannel = theconfig.readInto( mainchannel, "mainchannel" );
+    config.channels = theconfig.readInto( channels, "channels" );
+    config.nick = theconfig.readInto( nick, "nick" );
+    config.username = theconfig.readInto( username, "username" );
+    config.nickservpassword = theconfig.readInto( nickservpassword, "nickservpassword" );
+    config.owner_nick = theconfig.readInto( owner_nick, "owner_nick" );
+}
+
 int main ()
 {
-  //You will see why im making a bool variable here later  
-  bool in_channel = false;
+	Config config;
+	loadConfig(config);
+
+	const string welcome_msg = config.nick+" has connected. Type !time to see the time.";
+	const string kick_msg = "KICK "+config.mainchannel+" "+config.nick;
+	//353 is a code the server returns whenever you join a channel
+	const string chnl_join_rsl = "353 "+config.nick;
+	//433 replies that the nick is taken
+	const string nick_taken_rsl = "433 * "+config.nick+" :Nickname is already in use.";
+	const string rejoin_msg = "NOTICE "+config.nick+" :!rejoin";
+	//001 is just the generic welcome message saying you have logged in to the server.
+	const string server_welcome = "005 "+config.nick;
+	const string con_closed_nick = "[Registration timeout]";
+	const bool rejoin_on_kick = true;
+	const string password = make_pass();
+	const string quit_req = "NOTICE "+config.nick+" :!quit "+password;
+
+	bool in_channel = false;
   
   try
   {
     //Make the socket used to connect to the server
-    Socket sock(server,port);
+    Socket sock(config.server, config.port);
     //Incase there is no connection, say so
     if ( !sock.get_address() ) throw SocketException ( "Could not find irc server." );
     if ( !sock.connect() ) throw SocketException ( "Could not connect to irc server." );
@@ -198,8 +216,8 @@ int main ()
     //Accept some server replies after connecting
     sock >> reply;
     //Set the username and nick
-    sock << "USER "+usrname+" * 8 :"+usrname+"\r\n";
-    sock << "NICK "+nick+"\r\n";
+    sock << "USER "+config.username+" * 8 :"+config.username+"\r\n";
+    sock << "NICK "+config.nick+"\r\n";
     /* Lordofsraam fix here
     int nt = reply.find(nick_taken_rsl);
     while (true){
@@ -224,7 +242,7 @@ int main ()
     */
 	
 	//Nickserv add
-	sock << "PRIVMSG NICKSERV IDENTIFY "+nickservpass+"\r\n";
+	sock << "PRIVMSG NICKSERV IDENTIFY " + config.nickservpassword + "\r\n";
 	
     while (true){ //infi loop to stay connected
       
@@ -233,7 +251,7 @@ int main ()
       //join the channel if we are not already in it.
       int J = reply.find(server_welcome);
       if(J != string::npos) {
-	sock << "JOIN " + mainChannel + "\r\n";
+	sock << "JOIN " + config.mainchannel + "\r\n";
       }
       //Another ping reply
       string::size_type loc = reply.find( "PING :", 0 );
@@ -257,9 +275,9 @@ int main ()
       }
       //MESSAGES TO CHECK FOR
       int i = reply.find(chnl_join_rsl);
-      int b = reply.find(owner_nick);
+      int b = reply.find(config.owner_nick);
       int event_kick = reply.find(kick_msg);
-	  int event_whois = reply.find(whois_msg);
+	  //int event_whois = reply.find(whois_msg);
       int rj = reply.find(rejoin_msg);
       int q = reply.find(quit_req);
       
@@ -274,21 +292,22 @@ int main ()
 		cout << "\033[22;31mChannel join confirmation\033[22;30m... \033[22;32mCHECK\033[22;36m\r\n";
 		cout << "\033[22;31mSending password to owner\033[22;30m... \033[22;32mCHECK\033[22;36m\r\n";
 		cout << "\033[22;34mSession Quit Password: \033[01;32m"+password+"\033[22;36m\r\n";
-		sock << "NOTICE " + owner_nick + " The quit password is: "+password+"\r\n";
+		sock << "NOTICE " + config.owner_nick + " The quit password is: "+password+"\r\n";
+		sock << "NOTICE " + config.owner_nick + " The config password is: "+password+"\r\n";
 		in_channel = true;
     }      
       
     if (isCommand(reply, "!calc") && in_channel)
 	{
-		sock << "PRIVMSG " + mainChannel + " " + getMessage(reply) + "\r\n";
+		sock << "PRIVMSG " + config.mainchannel + " " + getMessage(reply) + "\r\n";
     }     
     else if (isCommand(reply, "!join") && in_channel)
 	{
-		sock << "PRIVMSG " + mainChannel + " " + getMessage(reply) + "\r\n";
+		sock << "PRIVMSG " + config.mainchannel + " " + getMessage(reply) + "\r\n";
     }   
     else if (isCommand(reply, "!restart") && in_channel)
 	{
-		sock << "PRIVMSG " + mainChannel + " Restarting (recompiling) the bot..\r\n";
+		sock << "PRIVMSG " + config.mainchannel + " Restarting (recompiling) the bot..\r\n";
 		system("python restart.py");
 		exit(1);
     } 
@@ -301,10 +320,10 @@ int main ()
 		FILE *in;
 		char buff[512];
 		string args = getCommandArgs(getMessage(reply), "!shell");
-		sock << "PRIVMSG " + mainChannel + " User: ,"+getNickname(reply)+",\r\n";
+		sock << "PRIVMSG " + config.mainchannel + " User: ,"+getNickname(reply)+",\r\n";
 		if(args.empty() || args.length() == 1)
 		{
-			sock << "PRIVMSG " + mainChannel + " Command usage: !shell COMMAND\r\n";
+			sock << "PRIVMSG " + config.mainchannel + " Command usage: !shell COMMAND\r\n";
 		}
 		else
 		{
@@ -312,15 +331,15 @@ int main ()
 			temp=args.c_str();
 			if(!(in = popen(temp, "r")))
 			{
-				sock << "PRIVMSG " + mainChannel + " Failed executing Shell command: " + args + "\r\n";
+				sock << "PRIVMSG " + config.mainchannel + " Failed executing Shell command: " + args + "\r\n";
 			}
 			else
 			{
-				sock << "PRIVMSG " + mainChannel + " Executing Shell command: " + args + "\r\n";
+				sock << "PRIVMSG " + config.mainchannel + " Executing Shell command: " + args + "\r\n";
 				while(fgets(buff, sizeof(buff), in)!=NULL)
 				{
 					cout << buff;
-					sock << "PRIVMSG " + mainChannel + " " + buff + "..\r\n";
+					sock << "PRIVMSG " + config.mainchannel + " " + buff + "..\r\n";
 				}
 				pclose(in);
 			}
@@ -329,19 +348,19 @@ int main ()
 	  
     if (event_kick != string::npos && in_channel)
 	{
-		sock << "PRIVMSG " + mainChannel + " Someone kicked me from: " + getChannel(reply) + "!\r\n";
+		sock << "PRIVMSG " + config.mainchannel + " Someone kicked me from: " + getChannel(reply) + "!\r\n";
 		if(rejoin_on_kick) 
 		{
-			sock << "JOIN " + mainChannel + "\r\n";
-			sock << "PRIVMSG " + mainChannel + " I have rejoined channel: " + getChannel(reply) + "!\r\n";
+			sock << "JOIN " + config.mainchannel + "\r\n";
+			sock << "PRIVMSG " + config.mainchannel + " I have rejoined channel: " + getChannel(reply) + "!\r\n";
 		}
 		in_channel = false;
     }
 	
     if (rj != string::npos && !in_channel)
 	{
-		sock << "JOIN " + mainChannel + "\r\n";
-		sock << "PRIVMSG " + mainChannel + " " + welcome_msg + "\r\n";
+		sock << "JOIN " + config.mainchannel + "\r\n";
+		sock << "PRIVMSG " + config.mainchannel + " " + welcome_msg + "\r\n";
     }
     
 	if (q != string::npos)

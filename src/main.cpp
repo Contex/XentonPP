@@ -175,7 +175,8 @@ void loadConfig(Config& config) {
     theconfig.readInto( config.server, "server" );
     theconfig.readInto( config.port, "port" );
     theconfig.readInto( config.mainchannel, "mainchannel" );
-
+    string temp = "#";
+    config.mainchannel = temp.append(config.mainchannel);
     theconfig.readInto( config.channels, "channels" );
     theconfig.readInto( config.nick, "nick" );
     theconfig.readInto( config.username, "username" );

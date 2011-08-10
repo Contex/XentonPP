@@ -1,8 +1,8 @@
 server = irc.crrpg.net
 port = 6667
-mainchannel = #Xenton++
+mainchannel = Xenton++
 channels = #Xenton,#Contex,#Minecraft
 nick = XentonPP
 username = XentonPP
-nickservpassword = tayeGa5epr5dr8b
+nickservpassword = example
 owner_nick = Contex

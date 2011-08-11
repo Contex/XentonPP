@@ -2,42 +2,16 @@
 
 #include "Socket.h"
 #include "SocketException.h"
+#include "Functions.h"
 #include "ConfigFile.h"
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string>
-#include <time.h>
-#include <algorithm>
-#include <iterator>
-#include <vector>
-#include <sstream>
-#include <fstream>
-#include <sstream>
+#include "Config.h"
+#include "Message.h"
+#include "Privmsg.h"
+#include "Notice.h"
+#include "Command.h"
+#include "main.h"
 
 using namespace std;
-
-vector<string> split(const string& strValue, char separator)
-{
-    vector<string> vecstrResult;
-    int startpos=0;
-    int endpos=0;
-
-    endpos = strValue.find_first_of(separator, startpos);
-    while (endpos != -1)
-    {       
-        vecstrResult.push_back(strValue.substr(startpos, endpos-startpos)); // add to vector
-        startpos = endpos+1; //jump past sep
-        endpos = strValue.find_first_of(separator, startpos); // find next
-        if(endpos==-1)
-        {
-            //lastone, so no 2nd param required to go to end of string
-            vecstrResult.push_back(strValue.substr(startpos));
-        }
-    }
-
-    return vecstrResult;
-}
 
 string make_two_digits(int x){
   if (x < 10){
@@ -68,127 +42,53 @@ string make_pass(){
   return pass_str;
 }
 
-string getRaw(string reply, string what) 
+bool isIdentified(string reply)
 {
-	int counter = 0;
-	istringstream iss(reply);
-	do
-	{
-		string sub;
-		iss >> sub;
-		if(counter == 0)
-		{
-			if(what.compare("nickname") == 0) 
-			{
-				sub.erase (0, 1);
-				int pos = sub.find("!");
-				string string1 = sub.substr(0, pos);
-				return string1;
-			}
-			else if(what.compare("host") == 0) 
-			{
-				sub.erase (0, 1);
-				int pos = sub.find("!");
-				string string1 = sub.substr(0, pos);
-				string string2 = sub.substr(pos);
-				return string2;
-			}
-			else if(what.compare("rawuser") == 0) 
-			{
-				sub.erase (0, 1);
-				return sub;
-			}
-		}
-		else if(counter == 1 && what.compare("event") == 0) 
-		{
-			return sub;
-		}
-		else if(counter == 2 && what.compare("channel") == 0) 
-		{
-			return sub;
-		}
-		else if(counter == 3 && what.compare("message") == 0) 
-		{
-			int pos = reply.find(sub);
-			reply = reply.substr(pos);
-			return reply;
-		}
-		++counter;
-	} while (iss); 
+	string message = getMessage(reply);
 }
 
-string getCommandArgs(string message, string command) 
+struct User
 {
-	//hacky way,  but works.
-	message.erase (0, command.length() + 2);
-	message.erase(message.end() - 2, message.end());
-	return message;
-}
-
-string getRawUser(string reply) { return getRaw(reply, "rawuser"); } 
-string getNickname(string reply) { return getRaw(reply, "nickname"); } 
-string getHost(string reply) { return getRaw(reply, "host"); } 
-string getEvent(string reply) { return getRaw(reply, "event"); } 
-string getChannel(string reply) { return getRaw(reply, "channel"); } 
-string getMessage(string reply) { return getRaw(reply, "message"); } 
-
-bool isCommand(string reply, string command) 
-{
-	if(reply.find(command) != string::npos)
-	{
-		string message = getMessage(reply);
-		int counter = 0;
-		istringstream iss(message);
-		do
-		{
-			string sub;
-			iss >> sub;
-			if(counter == 0) 
-			{
-				int pos = sub.find(command);
-				sub = sub.substr(pos);
-				if(command.compare(sub) == 0)
-				{
-					return true;
-				}
-				return false;
-			}
-			++counter;
-		} while (iss); 
-	}
-}
-
-struct Config
-{
-    string server;
-    string port;
-    string mainchannel;
-    string channels;
-    string nick;
-    string username;
-    string nickservpassword;
-    string owner_nick;
+    string nickname;
+    string host;
+	string channels;
+	string registred;
+	int idle;
+	bool identified;
+	bool botadmin;
+	bool ssl;
 };
 
-void loadConfig(Config& config) {
-    ConfigFile theconfig( "config.txt" );
-    theconfig.readInto( config.server, "server" );
-    theconfig.readInto( config.port, "port" );
-    theconfig.readInto( config.mainchannel, "mainchannel" );
-    string temp = "#";
-    config.mainchannel = temp.append(config.mainchannel);
-    theconfig.readInto( config.channels, "channels" );
-    theconfig.readInto( config.nick, "nick" );
-    theconfig.readInto( config.username, "username" );
-    theconfig.readInto( config.nickservpassword, "nickservpassword" );
-    theconfig.readInto( config.owner_nick, "owner_nick" );
+void loadUser(User& user, string reply) {
+	//if("NOTICE")
+	//{
+	//	string byuser;
+	//}
+	//else
+	//{
+		string nickname = getNickname(reply);
+		string host = getHost(reply);
+		string channels = "";
+		//bool identified = getNickname(reply);
+		user.nickname = getNickname(reply);
+		user.host = getHost(reply);
+		user.channels = "";
+		user.identified = false;
+		user.botadmin = false;
+		user.registred = "";
+	//}
 }
 
 int main ()
 {
 	Config config;
+	Colors color;
+	BotColors botColor;
+	User user;
 	loadConfig(config);
-
+	loadColors(color);
+	loadBotColors(botColor, color);
+	
 	const string welcome_msg = config.nick+" has connected. Type !time to see the time.";
 	const string kick_msg = "KICK "+config.mainchannel+" "+config.nick;
 	//353 is a code the server returns whenever you join a channel
@@ -201,7 +101,7 @@ int main ()
 	const string con_closed_nick = "[Registration timeout]";
 	const bool rejoin_on_kick = true;
 	const string password = make_pass();
-	const string quit_req = "NOTICE "+config.nick+" :!quit "+password;
+	const string quit_req = "PRIVMSG "+config.mainchannel+" :!quit "+password;
 
 	bool in_channel = false;
   
@@ -231,10 +131,11 @@ int main ()
     */
     //Reply to the ping from the server
     string::size_type loc = reply.find( "PING :", 0 );
-    if( loc != string::npos ){
-      string pong = "PONG :" + reply.substr(6,-1);
-      sock << pong;
-      }
+    if( loc != string::npos )
+	{
+		string pong = "PONG :" + reply.substr(6,-1);
+		sock << pong;
+    }
     sock >> reply;
     /* Lordofsraam fix here
     int nt = reply.find(nick_taken_rsl);
@@ -248,18 +149,36 @@ int main ()
 	
     while (true){ //infi loop to stay connected
       
-      sock >> reply; //keep showing what the server says
-      
+        sock >> reply; //keep showing what the server says
+		string event = getEvent(reply);
+		//Notice notice;
+		//notice.run(sock);
+		cout << event;
+		if(event.compare("NOTICE") != 0)
+		{
+			Notice notice;
+			notice.run(sock, reply);
+		}
+		else if(event.compare("PRIVMSG") != 0)
+		{
+			Privmsg privmsg;
+			privmsg.run(sock, reply);
+		}
+	  
+	  
       //join the channel if we are not already in it.
-      int J = reply.find(server_welcome);
-      if(J != string::npos) {
-	sock << "JOIN " + config.mainchannel + "\r\n";
-      }
+    int J = reply.find(server_welcome);
+    if(J != string::npos) 
+	{
+    	Join join;
+		join.joinChannel(sock, config.mainchannel);
+    }
       //Another ping reply
       string::size_type loc = reply.find( "PING :", 0 );
-      if( loc != string::npos ){
-	string pong = "PONG :" + reply.substr(6,-1);
-	sock << pong;
+      if( loc != string::npos )
+      {
+		string pong = "PONG :" + reply.substr(6,-1);
+		sock << pong;
       }
       //if the nick is not avalable
       int nt = reply.find(nick_taken_rsl);
@@ -281,72 +200,22 @@ int main ()
       int event_kick = reply.find(kick_msg);
 	  //int event_whois = reply.find(whois_msg);
       int rj = reply.find(rejoin_msg);
-      int q = reply.find(quit_req);
+      int event_quit_command = reply.find(quit_req);
       
       /*Find the channel join code (353)
       If found it makes in_channel true.
       This is so you can make things happen only if you know you are in 
       a channel.
       */       
-	  
+	
     if(i != string::npos) 
 	{
 		cout << "\033[22;31mChannel join confirmation\033[22;30m... \033[22;32mCHECK\033[22;36m\r\n";
 		cout << "\033[22;31mSending password to owner\033[22;30m... \033[22;32mCHECK\033[22;36m\r\n";
 		cout << "\033[22;34mSession Quit Password: \033[01;32m"+password+"\033[22;36m\r\n";
 		sock << "NOTICE " + config.owner_nick + " The quit password is: "+password+"\r\n";
-		sock << "NOTICE " + config.owner_nick + " The config password is: "+password+"\r\n";
 		in_channel = true;
     }      
-      
-    if (isCommand(reply, "!calc") && in_channel)
-	{
-		sock << "PRIVMSG " + config.mainchannel + " " + getMessage(reply) + "\r\n";
-    }     
-    else if (isCommand(reply, "!join") && in_channel)
-	{
-		sock << "PRIVMSG " + config.mainchannel + " " + getMessage(reply) + "\r\n";
-    }   
-    else if (isCommand(reply, "!restart") && in_channel)
-	{
-		sock << "PRIVMSG " + config.mainchannel + " Restarting (recompiling) the bot..\r\n";
-		system("python restart.py");
-		exit(1);
-    } 
-	else if (isCommand(reply, "!whois") && in_channel)
-	{
-		sock << "WHOIS " + getCommandArgs(getMessage(reply), "!whois") + "\r\n";
-    }   
-	else if (isCommand(reply, "!shell") && in_channel)
-	{
-		FILE *in;
-		char buff[512];
-		string args = getCommandArgs(getMessage(reply), "!shell");
-		sock << "PRIVMSG " + config.mainchannel + " User: ,"+getNickname(reply)+",\r\n";
-		if(args.empty() || args.length() == 1)
-		{
-			sock << "PRIVMSG " + config.mainchannel + " Command usage: !shell COMMAND\r\n";
-		}
-		else
-		{
-			const char *temp;
-			temp=args.c_str();
-			if(!(in = popen(temp, "r")))
-			{
-				sock << "PRIVMSG " + config.mainchannel + " Failed executing Shell command: " + args + "\r\n";
-			}
-			else
-			{
-				sock << "PRIVMSG " + config.mainchannel + " Executing Shell command: " + args + "\r\n";
-				while(fgets(buff, sizeof(buff), in)!=NULL)
-				{
-					cout << buff;
-					sock << "PRIVMSG " + config.mainchannel + " " + buff + "..\r\n";
-				}
-				pclose(in);
-			}
-		}
-    }   
 	  
     if (event_kick != string::npos && in_channel)
 	{
@@ -364,9 +233,10 @@ int main ()
 		sock << "JOIN " + config.mainchannel + "\r\n";
 		sock << "PRIVMSG " + config.mainchannel + " " + welcome_msg + "\r\n";
     }
-    
-	if (q != string::npos)
+
+	if (event_quit_command != string::npos)
 	{
+		sock << "PRIVMSG " + config.mainchannel + " 4QUIT Requested. Pass:\00320 " + password + "\017 by user " + getNickname(reply) + "\r\n";
 		sock << "QUIT Requested. Pass:\00320 "+password+"\017\r\n";
 		cout << "\033[01;31mRequested Quit. Pass: "+password+" \033[22;37m\r\n";
 		exit(1);

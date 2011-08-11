@@ -1,7 +1,7 @@
 clear
 build_it ()
 {
-  g++ main.cpp Socket.cpp Socket.h SocketException.h ConfigFile.cpp ConfigFile.h -o xentonpp
+  g++ main.cpp Socket.cpp Socket.h SocketException.h ConfigFile.cpp ConfigFile.h Colors.h Command.h Functions.h Join.h main.h Message.h Notice.h Privmsg.h -o xentonpp
   echo " "
   echo "<=====================================>"
   echo Done building!
@@ -16,4 +16,3 @@ build_it ()
 clear
 echo Building the Xenton++ IRC bot...
 build_it
-fi

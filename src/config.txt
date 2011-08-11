@@ -4,5 +4,5 @@ mainchannel = Xenton++
 channels = #Xenton,#Contex,#Minecraft
 nick = XentonPP
 username = XentonPP
-nickservpassword = example
+nickservpassword = banUQA6RUz
 owner_nick = Contex
